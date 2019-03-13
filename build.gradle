@@ -1,11 +1,15 @@
 plugins {
     id 'java'
+    id 'maven-publish'
 }
 
 group 'fr.litarvan'
 version '1.0.0'
 
 sourceCompatibility = 1.8
+archivesBaseName = 'packetz'
+
+compileJava.options.encoding = 'UTF-8'
 
 repositories {
     mavenCentral()
@@ -14,4 +18,46 @@ repositories {
 dependencies {
     compile 'net.sf.trove4j:trove4j:3.0.3'
     compile 'org.slf4j:slf4j-api:1.7.25'
+}
+
+jar {
+    from 'LICENSE'
+}
+
+task javadocJar(type: Jar) {
+    classifier = 'javadoc'
+    from javadoc
+}
+
+task sourcesJar(type: Jar) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+artifacts {
+    archives javadocJar, sourcesJar
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId group
+            artifactId archivesBaseName
+            version = version
+
+            from components.java
+
+            artifact sourcesJar {
+                classifier 'sources'
+            }
+
+            artifact javadocJar
+        }
+    }
+
+    repositories {
+        maven {
+            url "$buildDir/repo"
+        }
+    }
 }
