@@ -20,9 +20,9 @@ public class NetworkConnection
     private StreamWriter writer;
 
     private Side bound;
-    private ConnectionState state;
+    private String state;
 
-    public NetworkConnection(Side bound, Socket socket, PacketRegistry registry, ConnectionState defaultState) throws IOException
+    public NetworkConnection(Side bound, Socket socket, PacketRegistry registry, String defaultState) throws IOException
     {
         this.packetRegistry = registry;
 
@@ -58,7 +58,7 @@ public class NetworkConnection
 
         if (packetClass == null)
         {
-            log.error("Received unknown packet (state : {}) (id : 0x{}), skipping", state.getName().toLowerCase(), Integer.toHexString(id));
+            log.error("Received unknown packet (state : {}) (id : 0x{}), skipping", state.toLowerCase(), Integer.toHexString(id));
             return;
         }
 
@@ -145,12 +145,12 @@ public class NetworkConnection
         }
     }
 
-    public void setState(ConnectionState state)
+    public void setState(String state)
     {
         this.state = state;
     }
 
-    public ConnectionState getState()
+    public String getState()
     {
         return state;
     }

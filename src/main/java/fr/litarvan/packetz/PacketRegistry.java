@@ -19,6 +19,9 @@ public class PacketRegistry
     // Packet annotations, cached to not have to use reflection at each packet sending
     private Map<Class, Packet> packetInfos = new HashMap<>();
 
+    // Packets, by state
+    private Map<String, StatePackets> packets = new HashMap<>();
+
     public <P> void register(Class<P> packetClass)
     {
         if (!packetClass.isAnnotationPresent(Packet.class))
@@ -32,7 +35,7 @@ public class PacketRegistry
         register(packet.id(), packet.state(), packet.bound(), packetClass);
     }
 
-    public <P> void register(int id, ConnectionState state, Side bound, Class<P> packet)
+    public <P> void register(int id, String state, Side bound, Class<P> packet)
     {
         TIntObjectMap<Class> map = getPacketsFor(state, bound);
 
@@ -61,14 +64,19 @@ public class PacketRegistry
             {
                 Class<?>[] types = method.getParameterTypes();
 
-                if (types.length < 2 || types[0] != NetworkConnection.class)
+                if (types.length == 0 || types.length > 2)
                 {
-                    throw new IllegalArgumentException("Method " + handler.getClass().getName() + "#" + method.getName() + " requires 2 parameters (NetworkConnection, ? extends Packet) to be registered as handler (@Handler annotation present)");
+                    throw new IllegalArgumentException("Method " + handler.getClass().getName() + "#" + method.getName() + " requires 1 or 2 parameters (? extends Packet, NetworkConnection (optional)) to be registered as handler (@Handler annotation present)");
                 }
 
-                if (getPacketInfos(types[1]) == null)
+                if (getPacketInfos(types[0]) == null)
                 {
-                    throw new IllegalArgumentException("Method " + handler.getClass().getName() + "#" + method.getName() + " second parameter (supposed to be the Packet to handle) is " + types[1].getName() + ", but it isn't registered as a packet, use PacketRegistry#register");
+                    throw new IllegalArgumentException("Method " + handler.getClass().getName() + "#" + method.getName() + " first parameter (supposed to be the Packet to handle) is " + types[1].getName() + ", but it isn't registered as a packet, use PacketRegistry#register");
+                }
+
+                if (types.length == 2 && types[1] != NetworkConnection.class)
+                {
+                    throw new IllegalArgumentException("Method " + handler.getClass().getName() + "#" + method.getName() + " requires second parameter to be NetworkConnection, or not to have a second parameter, to be registered as handler (@Handler annotation present)");
                 }
 
                 if (!Modifier.isPublic(method.getModifiers()))
@@ -76,10 +84,17 @@ public class PacketRegistry
                     throw new IllegalArgumentException("Method " + handler.getClass().getName() + "#" + method.getName() + " is not public : can't be registered as handler");
                 }
 
-                handle(types[1], (packet, connection) -> {
+                handle(types[0], (packet, connection) -> {
                     try
                     {
-                        method.invoke(handler, packet, connection);
+                        if (types.length == 1)
+                        {
+                            method.invoke(handler, packet);
+                        }
+                        else
+                        {
+                            method.invoke(handler, packet, connection);
+                        }
                     }
                     catch (IllegalAccessException ignored)
                     {
@@ -99,7 +114,7 @@ public class PacketRegistry
         }
     }
 
-    public Class find(int id, ConnectionState state, Side bound)
+    public Class find(int id, String state, Side bound)
     {
         TIntObjectMap<Class> map = getPacketsFor(state, bound);
 
@@ -111,9 +126,15 @@ public class PacketRegistry
         return map.get(id);
     }
 
-    public TIntObjectMap<Class> getPacketsFor(ConnectionState state, Side bound)
+    public TIntObjectMap<Class> getPacketsFor(String state, Side bound)
     {
-        return bound == Side.CLIENT ? state.getClientPackets() : state.getServerPackets();
+        StatePackets list = packets.get(state);
+        if (list == null) {
+            list = new StatePackets();
+            packets.put(state, list);
+        }
+
+        return bound == Side.CLIENT ? list.getClientPackets() : list.getServerPackets();
     }
 
     public <P> PacketContainer<P> getPacketContainer(Class<P> packetClass)

@@ -133,7 +133,11 @@ public class StreamReader
     public byte[] readBytes(int amount) throws IOException
     {
         byte[] bytes = new byte[amount];
-        in.read(bytes);
+        int read = 0;
+
+        do {
+            read += in.read(bytes, read, amount - read);
+        } while (read != amount);
 
         readAmount += amount;
 
